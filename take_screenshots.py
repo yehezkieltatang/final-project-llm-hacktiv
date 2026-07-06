@@ -1,12 +1,16 @@
 """
 Screenshot script for SIEMGuard using Selenium.
-Takes screenshots of the application UI in various states.
+Captures real chat interactions with sample events and AI responses.
 """
 import os
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import Select
 
 SCREENSHOT_DIR = "assets"
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
@@ -18,42 +22,43 @@ def take_screenshot(driver, name, wait_time=2):
     print(f"[OK] {path}")
     return path
 
-def inject_chat_message(driver, role, content):
-    """Inject a chat message into the Streamlit DOM for screenshot purposes."""
-    js = """
-    // Find the chat message container
-    const main = document.querySelector('.stMain');
-    if (!main) return false;
-    
-    // Create a chat message element
-    const msgDiv = document.createElement('div');
-    msgDiv.setAttribute('data-testid', arguments[0] === 'user' ? 'user-message' : 'assistant-message');
-    msgDiv.className = 'stChatMessage';
-    msgDiv.style.cssText = 'background-color: ' + (arguments[0] === 'user' ? '#1E2A3A' : '#1A1D27') + '; border: 1px solid ' + (arguments[0] === 'user' ? '#00FFAA33' : '#FF6B6B33') + '; border-radius: 8px; padding: 12px; margin: 8px 0;';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'stMarkdown';
-    contentDiv.innerHTML = arguments[1];
-    
-    msgDiv.appendChild(contentDiv);
-    
-    // Insert before the chat input area
-    const chatInput = document.querySelector('[data-testid="stChatInput"]') || document.querySelector('textarea') || document.querySelector('input[type="text"]');
-    if (chatInput) {
-        chatInput.closest('.stChatInput')?.before(msgDiv) || chatInput.parentElement?.before(msgDiv);
-    } else {
-        main.appendChild(msgDiv);
-    }
-    return true;
-    """
-    try:
-        driver.execute_script(js, role, content)
-        return True
-    except:
+def find_chat_input(driver):
+    strategies = [
+        (By.CSS_SELECTOR, "textarea[data-testid='stChatInput']"),
+        (By.CSS_SELECTOR, "input[data-testid='stChatInput']"),
+        (By.CSS_SELECTOR, ".stChatInput textarea"),
+        (By.CSS_SELECTOR, ".stChatInput input"),
+        (By.TAG_NAME, "textarea"),
+        (By.TAG_NAME, "input"),
+    ]
+    for by, selector in strategies:
+        try:
+            elements = driver.find_elements(by, selector)
+            for el in elements:
+                if el.is_displayed():
+                    return el
+        except:
+            continue
+    return None
+
+def send_message(driver, text):
+    chat_input = find_chat_input(driver)
+    if not chat_input:
+        print("[WARN] Chat input not found")
         return False
+    driver.execute_script("arguments[0].scrollIntoView(true);", chat_input)
+    time.sleep(0.5)
+    chat_input.click()
+    time.sleep(0.3)
+    chat_input.clear()
+    chat_input.send_keys(text)
+    time.sleep(0.5)
+    chat_input.send_keys(Keys.ENTER)
+    print(f"[SENT] '{text[:60]}...'")
+    return True
 
 def main():
-    print("[START] Taking screenshots...")
+    print("[START] Taking screenshots with sample event interactions...")
     
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -62,71 +67,67 @@ def main():
     chrome_options.add_argument("--window-size=1400,900")
     
     driver = webdriver.Chrome(options=chrome_options)
+    wait = WebDriverWait(driver, 20)
     
     try:
-        # 1. Main page - English welcome
-        print("\n[1/5] Main page...")
+        # ====== 1. MAIN PAGE ======
+        print("\n[1/6] Main page...")
         driver.get("http://localhost:8501")
         time.sleep(5)
         take_screenshot(driver, "screenshot_main")
         
-        # 2. Sidebar visible
-        print("\n[2/5] Sidebar...")
+        # ====== 2. SIDEBAR ======
+        print("\n[2/6] Sidebar...")
         time.sleep(1)
         take_screenshot(driver, "screenshot_sidebar")
         
-        # 3. Inject a sample chat interaction
-        print("\n[3/5] Chat interaction...")
-        inject_chat_message(driver, "user", 
-            "<p>Please analyze this security event:</p>"
-            "<pre><code>{\n  \"alert_signature\": \"ET INFO SSH session in progress on Expected Port\",\n  \"alert_severity\": 3,\n  \"src_ip\": \"40.83.182.122\",\n  \"dest_ip\": \"103.122.32.67\",\n  \"proto\": \"TCP\",\n  \"dest_port\": 22\n}</code></pre>"
-        )
-        time.sleep(0.5)
-        inject_chat_message(driver, "assistant",
-            "<h3>🔍 Event Analysis</h3>"
-            "<p><strong>Summary:</strong> SSH session detected from <strong>Microsoft Azure (US)</strong> to <strong>Jakarta server</strong> on port 22.</p>"
-            "<p><strong>Severity:</strong> 🟡 <strong>Level 3</strong> (Informational) - Low risk</p>"
-            "<p><strong>MITRE ATT&CK:</strong> <code>TA0008</code> - Lateral Movement / <code>T1021.004</code> - SSH</p>"
-            "<p><strong>Cyber Kill Chain:</strong> Reconnaissance</p>"
-            "<p><strong>Recommendation:</strong> Monitor for unusual SSH patterns. This appears to be normal SSH traffic.</p>"
-        )
-        time.sleep(1)
-        take_screenshot(driver, "screenshot_chat")
-        
-        # 4. Switch to Indonesian
-        print("\n[4/5] Indonesian language...")
+        # ====== 3. LOAD SAMPLE EVENT VIA SIDEBAR ======
+        print("\n[3/6] Loading sample event from sidebar...")
         try:
-            radio_group = driver.find_element(By.CSS_SELECTOR, "div[data-testid='stSidebar']")
-            labels = radio_group.find_elements(By.TAG_NAME, "label")
+            # Find the "Load to Chat" button in sidebar
+            load_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Load to Chat') or contains(text(), 'Muat ke Chat')]")
+            driver.execute_script("arguments[0].scrollIntoView(true);", load_btn)
+            time.sleep(0.5)
+            load_btn.click()
+            print("[OK] Clicked Load to Chat button")
+            time.sleep(3)
+        except Exception as e:
+            print(f"[WARN] Could not click Load to Chat: {e}")
+        
+        # Wait for AI to analyze the event
+        print("[WAIT] Waiting for AI event analysis (25 seconds)...")
+        time.sleep(25)
+        take_screenshot(driver, "screenshot_sample_event")
+        
+        # ====== 4. ASK FOLLOW-UP QUESTION ======
+        print("\n[4/6] Asking follow-up question about the event...")
+        if send_message(driver, "What is the severity level of this event and should we be concerned?"):
+            print("[WAIT] Waiting for follow-up response (20 seconds)...")
+            time.sleep(20)
+        take_screenshot(driver, "screenshot_followup")
+        
+        # ====== 5. SWITCH TO INDONESIAN ======
+        print("\n[5/6] Switching to Indonesian...")
+        try:
+            labels = driver.find_elements(By.TAG_NAME, "label")
             for label in labels:
                 if "Indonesia" in label.text:
                     driver.execute_script("arguments[0].scrollIntoView(true);", label)
                     time.sleep(0.3)
                     label.click()
-                    print("[DEBUG] Switched to Indonesian")
+                    print("[OK] Switched to Indonesian")
                     time.sleep(3)
                     break
         except Exception as e:
-            print(f"[WARN] Language switch failed: {e}")
+            print(f"[WARN] Language switch: {e}")
         
         take_screenshot(driver, "screenshot_indonesia")
         
-        # 5. Indonesian with chat
-        print("\n[5/5] Indonesian chat...")
-        inject_chat_message(driver, "user",
-            "<p>Jelaskan event keamanan ini:</p>"
-            "<pre><code>{\n  \"alert_signature\": \"SURICATA STREAM Packet with broken ack\",\n  \"alert_severity\": 3,\n  \"src_ip\": \"103.78.114.53\",\n  \"dest_port\": 445,\n  \"proto\": \"TCP\"\n}</code></pre>"
-        )
-        time.sleep(0.5)
-        inject_chat_message(driver, "assistant",
-            "<h3>🔍 Analisis Event</h3>"
-            "<p><strong>Ringkasan:</strong> Paket TCP dengan <em>broken acknowledgment</em> terdeteksi dari IP lokal Jakarta menuju port <strong>445 (SMB)</strong>.</p>"
-            "<p><strong>Tingkat Keparahan:</strong> 🟡 <strong>Level 3</strong> (Informational)</p>"
-            "<p><strong>MITRE ATT&CK:</strong> <code>TA0043</code> - Reconnaissance / <code>T1595</code> - Active Scanning</p>"
-            "<p><strong>Cyber Kill Chain:</strong> Reconnaissance</p>"
-            "<p><strong>Rekomendasi:</strong> Periksa apakah ada scanning SMB yang mencurigakan dari IP internal.</p>"
-        )
-        time.sleep(1)
+        # ====== 6. ASK IN INDONESIAN ======
+        print("\n[6/6] Asking in Indonesian about security event...")
+        if send_message(driver, "Analisis event dengan signature 'SURICATA STREAM Packet with broken ack' dan jelaskan dampaknya"):
+            print("[WAIT] Waiting for Indonesian analysis (20 seconds)...")
+            time.sleep(20)
         take_screenshot(driver, "screenshot_indonesia_chat")
         
         print("\n[DONE] All screenshots captured!")
