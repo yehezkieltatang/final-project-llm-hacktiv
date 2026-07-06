@@ -19,7 +19,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-
-# Screenshots (generated)
-assets/*.png
-assets/*.jpg
