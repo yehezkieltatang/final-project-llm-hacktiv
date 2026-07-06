@@ -1,5 +1,7 @@
 # 🛡️ SIEMGuard — AI Security Event Analyzer
 
+**Created by Yehezkiel Tatang for Hacktiv8 Final Project - LLM Course**
+
 A Streamlit-based chatbot that helps SOC analysts analyze security events using Groq API (LLaMA 3.3 70B).
 
 ## Features
@@ -58,6 +60,20 @@ A Streamlit-based chatbot that helps SOC analysts analyze security events using 
 4. **Ask Questions**: Ask about security concepts, CVEs, or best practices
 5. **Export**: Download your analysis session
 
+## Screenshots
+
+### Main Interface
+![Main Interface](assets/screenshot_main.png)
+
+### Chat Interaction - MITRE ATT&CK Question
+![Chat Interaction](assets/screenshot_chat.png)
+
+### Follow-up Analysis
+![Follow-up Analysis](assets/screenshot_followup.png)
+
+### Indonesian Language Mode
+![Indonesian Mode](assets/screenshot_indonesia_chat.png)
+
 ## Sample Event Structure
 
 The sample events are from a NOGTUS Apex SIEM platform with fields like:
@@ -86,14 +102,6 @@ final-project-llm-hacktiv/
 └── .streamlit/
     └── config.toml           # Dark theme configuration
 ```
-
-## Screenshots
-
-### Main Chat Interface (Dark Mode)
-![Chat Interface](assets/screenshot_main.png)
-
-### Event Analysis
-![Event Analysis](assets/screenshot_analysis.png)
 
 ## License
 
